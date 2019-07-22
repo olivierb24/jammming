@@ -26,65 +26,74 @@ class Spotify extends React.Component{
         }        
     }
     
-  
+    
+    async fetchingRequest(url, headers) {
+        try{
+            const response = await fetch(url, headers);
+            if (response.ok){
+                const jsonResponse = await response.json();
+                return jsonResponse;
+            }
+            throw new Error('Request Failed');
+        } catch(error){
+            console.log(error.message);
+        }
+    }
+    
     async savePlaylist(playlistName, trackArray ){
         if (!playlistName || !trackArray){
             return; 
         } 
-
+        
         const accessToken = await this.getAccessToken();
         const headers = { Authorization:  `Bearer${accessToken}`};
         let userId;
-        try{
-        const response = await fetch('https://api.spotify.com/v1/me', headers);
-        if (response.ok){
-            const jsonResponse = await response.json();
-            userId = jsonResponse.id;
-
-            const playlistResponse = await fetch(`https://api.spotify.com/v1/v1/users/${userId}/playlists`, {
-                headers: headers,
-                method: 'POST',
-                body: JSON.stringify({name:playlistName})
-            });
-            if (playlistResponse.ok) {
-                const jsonPlaylistResponse = await playlistResponse.json();
-                const playlistID = jsonPlaylistResponse.id;
-                return playlistID;
-        } 
-        }
-        throw new Error('Request Failed');
-        } catch(error){
-            console.log(error.message);
-        }
-      }
-    
-
-    async search(term){
-        accessToken = await this.getAccessToken();
-        try{
-            const response = await fetch(`https://api.spotify.com/v1/search?type=track&q=${term}`, {
-            headers: {Authorization: `Bearer ${accessToken}`}
+        
+        this.fetchingRequest('https://api.spotify.com/v1/me', headers)
+        .then(response => {
+            userId = response.id;
+            return this.fetchingRequest(`https://api.spotify.com/v1/v1/users/${userId}/playlists`, {
+            headers: headers,
+            method: 'POST',
+            body: JSON.stringify({name:playlistName})
         });
-        if (response.ok) {
-            const jsonResponse = await response.json();
-            if (!jsonResponse.tracks) {
-                return [];
-            } else{
-                return jsonResponse.tracks.items.map( track => ({
-                    ID: track.id,
-                    Name: track.name,
-                    Artist: track.artists[0].name,
-                    Album: track.album,
-                    URI: track.uri
-                }));
-            };
-        }
-        throw new Error('Request Failed!');
-    } catch (error) {
-        console.log(error);
+    })
+    .then( secondResponse => {
+        const playlistId = secondResponse.id;
+        return this.fetchingRequest(`https://api.spotify.com/v1/users/${userId}/playlists/${playlistId}/tracks`, {
+            headers: headers,
+            method: 'POST',
+            body: JSON.stringify({uris: trackArray})
+        });
+    })
+}
+
+async search(term){
+    accessToken = await this.getAccessToken();
+    try{
+        const response = await fetch(`https://api.spotify.com/v1/search?type=track&q=${term}`, {
+        headers: {Authorization: `Bearer ${accessToken}`}
+    });
+    if (response.ok) {
+        const jsonResponse = await response.json();
+        if (!jsonResponse.tracks) {
+            return [];
+        } else{
+            return jsonResponse.tracks.items.map( track => ({
+                ID: track.id,
+                Name: track.name,
+                Artist: track.artists[0].name,
+                Album: track.album,
+                URI: track.uri
+            }));
+        };
     }
-    
-    
+    throw new Error('Request Failed!');
+} catch (error) {
+    console.log(error);
+}
+
+
 }
 }
 /*Need to wrap it in a promise statement */
